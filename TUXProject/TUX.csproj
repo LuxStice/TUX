@@ -8,7 +8,7 @@
         <AssemblyName>com.github.luxstice.tux</AssemblyName>
         <Product>Textures Unlimited eXpanded</Product>
         <Description>modify textures in game</Description>
-        <Version>0.1.0</Version>
+        <Version>0.2.0</Version>
         <RestoreAdditionalProjectSources>
             https://api.nuget.org/v3/index.json;
             https://nuget.bepinex.dev/v3/index.json
@@ -24,8 +24,8 @@
         </Reference>
     </ItemGroup>
 	<ItemGroup>
-		<Reference Include="Assembly-CSharp">
-			<HintPath>..\external_dlls\SpaceWarp.dll</HintPath>
+		<Reference Include="SORRY">
+			<HintPath>..\external_dlls\SORRY.dll</HintPath>
 			<Publicize>true</Publicize>
 			<Private>false</Private>
 		</Reference>
@@ -35,6 +35,7 @@
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.0" PrivateAssets="all" />
         <PackageReference Include="BepInEx.Core" Version="5.*" />
         <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+		<PackageReference Include="SpaceWarp" Version="1.0.1" />
         <PackageReference Include="HarmonyX" Version="2.10.1" />
         <PackageReference Include="UnityEngine.Modules" Version="2020.3.33" IncludeAssets="compile" />
     </ItemGroup>

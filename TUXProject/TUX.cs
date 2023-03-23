@@ -9,6 +9,8 @@ using SpaceWarp.API.Game.Extensions;
 using SpaceWarp.API.UI;
 using SpaceWarp.API.UI.Appbar;
 using UnityEngine;
+using RTG;
+using static iT;
 
 namespace TUX;
 
@@ -28,11 +30,15 @@ public class TUXPlugin : BaseSpaceWarpPlugin
     private const string ToolbarOABButtonID = "BTN-TUXOAB";
 
     public static TUXPlugin Instance { get; set; }
+    public static bool Autoupdate = true;
 
-    static float mMetalicSmoothness, mSmoothnessScale, mMipBias, nDetailNormalScale, nDetailNormalTiling = 1f, oOcclusionStrenght,
-        timeOfDayMin, timeOfDayMax, pmSmoothnessScale, pmRimFalloff = 1f;
-    static bool useTimeOfDay, pmSmoothnessOverride;
+    static float mMetalicSmoothness = 1, mSmoothnessScale = 1, mMipBias = 0.8f, nDetailNormalScale = 1, nDetailNormalTiling = 1f, oOcclusionStrenght = 1,
+        timeOfDayMin = -0.005f, timeOfDayMax = 0.005f, pmSmoothnessScale = 1, pmRimFalloff = 1f;
+    static bool useTimeOfDay, pmSmoothnessOverride, useDetailMask, useDetailMap = true, disableNormalTexture;
     public static bool dirty;
+    private static Shader shader;
+
+    public static int[] propertyIds;
 
     /// <summary>
     /// Runs when the mod is first initialized.
@@ -42,6 +48,8 @@ public class TUXPlugin : BaseSpaceWarpPlugin
         base.OnInitialized();
 
         Instance = this;
+
+        shader = Shader.Find("KSP2/Scenery/Standard (Opaque)");
 
         // Register Flight AppBar button
         Appbar.RegisterAppButton(
@@ -69,6 +77,40 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
         // Register all Harmony patches in the project
         Harmony.CreateAndPatchAll(typeof(TUXPlugin).Assembly);
+
+        propertyIds = new int[]
+        {
+            Shader.PropertyToID("_MainTex"),
+            Shader.PropertyToID("_MetallicGlossMap"),
+            Shader.PropertyToID("_BumpMap"),
+            Shader.PropertyToID("_OcclusionMap"),
+            Shader.PropertyToID("_EmissionMap"),
+            Shader.PropertyToID("_PaintMaskGlossMap"),
+
+            Shader.PropertyToID("_Metallic"),
+            Shader.PropertyToID("_GlossMapScale"),
+            Shader.PropertyToID("_MipBias"),
+
+            Shader.PropertyToID("_DetailBumpMap"),
+            Shader.PropertyToID("_DetailMask"),
+            Shader.PropertyToID("_DetailBumpScale"),
+            Shader.PropertyToID("_DetailBumpTiling"),
+
+            Shader.PropertyToID("_OcclusionStrength"),
+
+            Shader.PropertyToID("_UseTimeOfDay"),
+            Shader.PropertyToID("_TimeOfDayDotMin"),
+            Shader.PropertyToID("_TimeOfDayDotMax"),
+
+            Shader.PropertyToID("_PaintGlossMapScale"),
+            Shader.PropertyToID("_SmoothnessOverride"),
+            Shader.PropertyToID("_RimFalloff")
+        };
+    }
+
+    void Start()
+    {
+        textures = ColorsPatch.GetTextures(partName);
     }
 
     /// <summary>
@@ -81,6 +123,7 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
         if (_isWindowOpen)
         {
+            textures = ColorsPatch.GetTextures(partName);
             _windowRect = GUILayout.Window(
                 GUIUtility.GetControlID(FocusType.Passive),
                 _windowRect,
@@ -90,10 +133,29 @@ public class TUXPlugin : BaseSpaceWarpPlugin
                 GUILayout.Width(350)
             );
         }
-        dirty = true;
     }
 
-    public static string partName;
+    private static void SetDefaults()
+    {
+
+        mMetalicSmoothness = 1;
+        mSmoothnessScale = 1;
+        mMipBias = 0.8f;
+        nDetailNormalScale = 1;
+        nDetailNormalTiling = 1f;
+        oOcclusionStrenght = 1;
+        timeOfDayMin = -0.005f;
+        timeOfDayMax = 0.005f;
+        pmSmoothnessScale = 1;
+        pmRimFalloff = 1f;
+        useTimeOfDay = false;
+        pmSmoothnessOverride = false;
+        useDetailMask = false;
+        useDetailMap = false;
+        disableNormalTexture = false;
+    }
+
+    public static string partName = "T-38_v1";
     public static Texture[] textures;
 
     /// <summary>
@@ -102,14 +164,25 @@ public class TUXPlugin : BaseSpaceWarpPlugin
     /// <param name="windowID"></param>
     private static void FillWindow(int windowID)
     {
-        GUILayout.Label("Textures Unlimited eXpanded - modify textures in game");
+        GUILayout.Label("modify textures in game");
         GUI.DragWindow(new Rect(0, 0, 10000, 20));
 
         partName = GUILayout.TextField(partName);
 
+        DrawField();
+
+        if (GUILayout.Button("Reset"))
+            SetDefaults();
+    }
+
+
+
+    public static void DrawField()
+    {
+        GUILayout.Label("Mettalic/Smoothness");
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"Mettalic/Smoothness ({mMetalicSmoothness:0.00})");
-        mMetalicSmoothness =  GUILayout.HorizontalSlider(mMetalicSmoothness, 0f, 1f);
+        GUILayout.Label($"Mettalic ({mMetalicSmoothness:0.00})");
+        mMetalicSmoothness = GUILayout.HorizontalSlider(mMetalicSmoothness, 0f, 1f);
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
@@ -125,13 +198,16 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
 
         GUILayout.Label("Normal/Bump");
+        disableNormalTexture = GUILayout.Toggle(disableNormalTexture, new GUIContent("Ignore Normal Map"), GUI.skin.toggle);
+        useDetailMap = GUILayout.Toggle(useDetailMap, new GUIContent("Use Detail Map"), GUI.skin.toggle);
+        useDetailMask = GUILayout.Toggle(useDetailMask, new GUIContent("Use Detail Mask"), GUI.skin.toggle);
         GUILayout.BeginHorizontal();
         GUILayout.Label($"Scale ({nDetailNormalScale:0.00})");
         nDetailNormalScale = GUILayout.HorizontalSlider(nDetailNormalScale, 0f, 1f);
         GUILayout.EndHorizontal();
         GUILayout.BeginHorizontal();
         GUILayout.Label($"Tiling ({nDetailNormalTiling:0.00})");
-        nDetailNormalTiling = GUILayout.HorizontalSlider(nDetailNormalTiling, 0.01f, 1f);
+        nDetailNormalTiling = GUILayout.HorizontalSlider(nDetailNormalTiling, 0.01f, 10f);
         GUILayout.EndHorizontal();
 
 
@@ -144,8 +220,8 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
 
 
-        GUILayout.Label("TimeOfDay?");
-        //useTimeOfDay = GUILayout.DoToggle(useTimeOfDay);
+        GUILayout.Label("TimeOfDay");
+        useTimeOfDay = GUILayout.Toggle(useTimeOfDay, new GUIContent("Use Time of Day"), GUI.skin.toggle);
         GUILayout.BeginHorizontal();
         GUILayout.Label($"Min ({timeOfDayMin:0.00})");
         timeOfDayMin = GUILayout.HorizontalSlider(timeOfDayMin, -1f, 1f);
@@ -155,75 +231,77 @@ public class TUXPlugin : BaseSpaceWarpPlugin
         timeOfDayMax = GUILayout.HorizontalSlider(timeOfDayMax, -1f, 1f);
         GUILayout.EndHorizontal();
 
-
-
         GUILayout.Label("Paint Map");
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"Smoothness Scale ({pmSmoothnessScale:0.00})");
+        GUILayout.Label($"Smth Scale ({pmSmoothnessScale:0.00})");
         pmSmoothnessScale = GUILayout.HorizontalSlider(pmSmoothnessScale, 0f, 1f);
         GUILayout.EndHorizontal();
-        //pmSmoothnessOverride = GUILayout.DoToggle(pmSmoothnessOverride);
+        pmSmoothnessOverride = GUILayout.Toggle(pmSmoothnessOverride, new GUIContent("Smth Ovrrd"), GUI.skin.toggle);
         GUILayout.BeginHorizontal();
         GUILayout.Label($"Rim Falloff ({pmRimFalloff:0.00})");
         pmRimFalloff = GUILayout.HorizontalSlider(pmRimFalloff, 0.01f, 5f);
         GUILayout.EndHorizontal();
 
-        if (GUILayout.Button("Update"))
-            dirty = true;
 
-        if (GUILayout.Button("Reload Textures"))
-            ReloadTextures();
+        Autoupdate = GUILayout.Toggle(Autoupdate, new GUIContent("Auto-Update"), GUI.skin.toggle);
+        if (GUILayout.Button("Update"))
+        {
+            TUXPlugin.dirty = true;
+        }
     }
 
     private static void ReloadTextures()
     {
-        SpaceWarp.Patching.ColorsPatch.ReloadTextures();
-        textures = SpaceWarp.Patching.ColorsPatch.GetTextures(partName);
+        ColorsPatch.ReloadTextures();
+        textures = ColorsPatch.GetTextures(partName);
         dirty = true;
     }
 
-    public static void SetShaderSettings(ref Renderer renderer)
+    public static Material GetMaterial()
     {
-        Shader shader = Shader.Find("KSP2/Scenery/Standard (Opaque)");
+        Material material = new(shader);
 
-        int[] propertyIds = new int[]
+        for (int i = 0; i < 6; i++)
         {
-            Shader.PropertyToID("_MainTex"),
-            Shader.PropertyToID("_MetallicGlossMap"),
-            Shader.PropertyToID("_BumpMap"),
-            Shader.PropertyToID("_OcclusionMap"),
-            Shader.PropertyToID("_EmissionMap"),
-            Shader.PropertyToID("_PaintMaskGlossMap")
-        };
+            if (i == 2 && disableNormalTexture)
+                continue;
 
-        Material material = new Material(shader);
-
-        foreach(int i in propertyIds)
-        {
-            material.SetTexture(i, textures[i]);
+            material.SetTexture(propertyIds[i], textures[i]);
         }
 
-        material.SetFloat("_Metallic", mMetalicSmoothness);
-        material.SetFloat("_GlossMapScale", mSmoothnessScale);
-        material.SetFloat("_MipBias", mMipBias);
+        material.SetFloat(propertyIds[6], mMetalicSmoothness);
+        material.SetFloat(propertyIds[7], mSmoothnessScale);
+        material.SetFloat(propertyIds[8], mMipBias);
 
-        material.SetFloat("_DetailBumpScale", nDetailNormalScale);
-        material.SetFloat("_DetailBumpTiling", nDetailNormalTiling);
+        if (disableNormalTexture)
+            material.SetTexture(propertyIds[ColorsPatch.BUMP], Texture2D.normalTexture);
 
-        material.SetFloat("_OcclusionStrength", oOcclusionStrenght);
+        if (useDetailMap)
+            material.SetTexture(propertyIds[9], textures[ColorsPatch.BUMP]);
+        else
+            material.SetTexture(propertyIds[9], Texture2D.normalTexture);
 
-        //material.SetFloat("_UseTimeOfDay", false);
-        material.SetFloat("_TimeOfDayDotMin", timeOfDayMin);
-        material.SetFloat("_TimeOfDayDotMax", timeOfDayMax);
+        if (useDetailMask)
+            material.SetTexture(propertyIds[10], textures[ColorsPatch.BUMP]);
+        else
+            material.SetTexture(propertyIds[10], Texture2D.whiteTexture);
 
-        material.SetFloat("_PaintGlossMapScale", pmSmoothnessScale);
-        //material.SetFloat("_SmoothnessOverride", pmSmoothnessOverride);
-        material.SetFloat("_RimFalloff", pmRimFalloff);
+        material.SetFloat(propertyIds[11], nDetailNormalScale);
+        material.SetFloat(propertyIds[12], nDetailNormalTiling);
+
+        material.SetFloat(propertyIds[13], oOcclusionStrenght);
+
+        if (useTimeOfDay)
+            material.SetFloat(propertyIds[14], Convert.ToSingle(useTimeOfDay));
+        material.SetFloat(propertyIds[15], timeOfDayMin);
+        material.SetFloat(propertyIds[16], timeOfDayMax);
+
+        material.SetFloat(propertyIds[17], pmSmoothnessScale);
+        if (pmSmoothnessOverride)
+            material.SetFloat(propertyIds[18], Convert.ToSingle(pmSmoothnessOverride));
+        material.SetFloat(propertyIds[19], pmRimFalloff);
 
 
-        renderer.material = material;
-
-        if (renderer.material.shader.name != shader.name)
-            renderer.SetMaterial(material); //Sometimes the material Set doesn't work, this seems to be more reliable.
+        return material;
     }
 }

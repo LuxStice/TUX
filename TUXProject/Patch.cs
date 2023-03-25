@@ -20,6 +20,9 @@ class Patch
             Renderer[] renderers = __instance.gameObject.GetComponentsInChildren<Renderer>(true);
             Material toSet = TUXPlugin.GetMaterial();
 
+            if (toSet is null)
+                return;
+
             for (int i = 0; i < renderers.Length; i++)
             {
                 renderers[i].material = toSet;

@@ -34,7 +34,7 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
     static float mMetalicSmoothness = 1, mSmoothnessScale = 1, mMipBias = 0.8f, nDetailNormalScale = 1, nDetailNormalTiling = 1f, oOcclusionStrenght = 1,
         timeOfDayMin = -0.005f, timeOfDayMax = 0.005f, pmSmoothnessScale = 1, pmRimFalloff = 1f;
-    static bool useTimeOfDay, pmSmoothnessOverride, useDetailMask, useDetailMap = true, disableNormalTexture;
+    static bool useTimeOfDay, pmSmoothnessOverride, useDetailMask, useDetailMap, disableNormalTexture;
     public static bool dirty;
     private static Shader shader;
 
@@ -60,18 +60,6 @@ public class TUXPlugin : BaseSpaceWarpPlugin
             {
                 _isWindowOpen = isOpen;
                 GameObject.Find(ToolbarFlightButtonID)?.GetComponent<UIValue_WriteBool_Toggle>()?.SetValue(isOpen);
-            }
-        );
-
-        // Register OAB AppBar Button
-        Appbar.RegisterOABAppButton(
-            "Textures Unlimited eXpanded",
-            ToolbarOABButtonID,
-            AssetManager.GetAsset<Texture2D>($"{SpaceWarpMetadata.ModID}/images/icon.png"),
-            isOpen =>
-            {
-                _isWindowOpen = isOpen;
-                GameObject.Find(ToolbarOABButtonID)?.GetComponent<UIValue_WriteBool_Toggle>()?.SetValue(isOpen);
             }
         );
 
@@ -110,9 +98,9 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
     void Start()
     {
-        textures = ColorsPatch.GetTextures(partName);
     }
 
+    static bool doSetNormalMap = true;
     /// <summary>
     /// Draws a simple UI window when <code>this._isWindowOpen</code> is set to <code>true</code>.
     /// </summary>
@@ -123,14 +111,13 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
         if (_isWindowOpen)
         {
-            textures = ColorsPatch.GetTextures(partName);
             _windowRect = GUILayout.Window(
                 GUIUtility.GetControlID(FocusType.Passive),
                 _windowRect,
                 FillWindow,
                 "Textures Unlimited eXpanded",
                 GUILayout.Height(600),
-                GUILayout.Width(350)
+                GUILayout.Width(400)
             );
         }
     }
@@ -155,7 +142,7 @@ public class TUXPlugin : BaseSpaceWarpPlugin
         disableNormalTexture = false;
     }
 
-    public static string partName = "T-38_v1";
+    public static string partName = "";
     public static Texture[] textures;
 
     /// <summary>
@@ -165,20 +152,38 @@ public class TUXPlugin : BaseSpaceWarpPlugin
     private static void FillWindow(int windowID)
     {
         GUILayout.Label("modify textures in game");
-        GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        GUI.DragWindow(new Rect(0, 0, 10000, 40));
 
         partName = GUILayout.TextField(partName);
-
-        DrawField();
-
-        if (GUILayout.Button("Reset"))
-            SetDefaults();
+        
+        if (ColorsPatch.partHash.ContainsKey(partName))
+            DrawField();
+        else
+        {
+            textures = null;
+            doSetNormalMap = true;
+            GUILayout.Label("Insert a valid partName above!");
+        }
     }
 
 
+    static bool enableConvert = false;
 
     public static void DrawField()
     {
+        if (GUILayout.Button("Load textures"))
+        {
+            ReloadTextures();
+            if (doSetNormalMap)
+            {
+                SetNormalMap((Texture2D)textures[ColorsPatch.BUMP]);
+                doSetNormalMap = false;
+            }
+        }
+
+        if (textures is null)
+            return;
+
         GUILayout.Label("Mettalic/Smoothness");
         GUILayout.BeginHorizontal();
         GUILayout.Label($"Mettalic ({mMetalicSmoothness:0.00})");
@@ -198,6 +203,7 @@ public class TUXPlugin : BaseSpaceWarpPlugin
 
 
         GUILayout.Label("Normal/Bump");
+        enableConvert = GUILayout.Toggle(enableConvert, new GUIContent("Should Convert map?"), GUI.skin.toggle);
         disableNormalTexture = GUILayout.Toggle(disableNormalTexture, new GUIContent("Ignore Normal Map"), GUI.skin.toggle);
         useDetailMap = GUILayout.Toggle(useDetailMap, new GUIContent("Use Detail Map"), GUI.skin.toggle);
         useDetailMask = GUILayout.Toggle(useDetailMask, new GUIContent("Use Detail Mask"), GUI.skin.toggle);
@@ -248,41 +254,63 @@ public class TUXPlugin : BaseSpaceWarpPlugin
         {
             TUXPlugin.dirty = true;
         }
+
+        if (GUILayout.Button("Reset"))
+            SetDefaults();
+    }
+
+    public static Texture normalMap;
+
+    private static void SetNormalMap(Texture2D texture)
+    {
+        Texture2D convertedNormalMap = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false, true);
+
+        Graphics.CopyTexture(texture, convertedNormalMap);
+
+        Debug.Log($"Setting Normal Map" +
+            $"\t{convertedNormalMap.activeTextureColorSpace}\t{convertedNormalMap.format}");
+
+        normalMap = convertedNormalMap;
     }
 
     private static void ReloadTextures()
     {
-        ColorsPatch.ReloadTextures();
         textures = ColorsPatch.GetTextures(partName);
         dirty = true;
     }
 
     public static Material GetMaterial()
     {
+        if(textures is null || textures.Length == 0)
+            return null;
+
         Material material = new(shader);
 
         for (int i = 0; i < 6; i++)
         {
-            if (i == 2 && disableNormalTexture)
-                continue;
-
-            material.SetTexture(propertyIds[i], textures[i]);
+            if(i == 2)
+            {
+                if (disableNormalTexture)
+                material.SetTexture(propertyIds[i], Texture2D.normalTexture);
+            else
+                material.SetTexture(propertyIds[i], normalMap);
+            }
+            else
+                material.SetTexture(propertyIds[i], textures[i]);
         }
 
         material.SetFloat(propertyIds[6], mMetalicSmoothness);
         material.SetFloat(propertyIds[7], mSmoothnessScale);
         material.SetFloat(propertyIds[8], mMipBias);
 
-        if (disableNormalTexture)
-            material.SetTexture(propertyIds[ColorsPatch.BUMP], Texture2D.normalTexture);
 
         if (useDetailMap)
-            material.SetTexture(propertyIds[9], textures[ColorsPatch.BUMP]);
+            material.SetTexture(propertyIds[9], normalMap);
         else
             material.SetTexture(propertyIds[9], Texture2D.normalTexture);
 
         if (useDetailMask)
-            material.SetTexture(propertyIds[10], textures[ColorsPatch.BUMP]);
+            material.SetTexture(propertyIds[10], normalMap);
         else
             material.SetTexture(propertyIds[10], Texture2D.whiteTexture);
 

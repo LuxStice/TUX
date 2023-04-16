@@ -8,10 +8,11 @@
         <AssemblyName>com.github.luxstice.tux</AssemblyName>
         <Product>Textures Unlimited eXpanded</Product>
         <Description>modify textures in game</Description>
-        <Version>0.2.0</Version>
+        <Version>1.0.0</Version>
         <RestoreAdditionalProjectSources>
             https://api.nuget.org/v3/index.json;
-            https://nuget.bepinex.dev/v3/index.json
+            https://nuget.bepinex.dev/v3/index.json;
+		    https://nuget.spacewarp.org/v3/index.json
         </RestoreAdditionalProjectSources>
         <RootNamespace>TUX</RootNamespace>
         <ModId Condition="'$(ModId)'==''">tux</ModId>
@@ -22,20 +23,22 @@
             <Publicize>true</Publicize>
             <Private>false</Private>
         </Reference>
-    </ItemGroup>
-	<ItemGroup>
-		<Reference Include="SORRY">
-			<HintPath>..\external_dlls\SORRY.dll</HintPath>
+		<Reference Include="SpaceWarp">
+			<HintPath>..\external_dlls\SpaceWarp.dll</HintPath>
 			<Publicize>true</Publicize>
 			<Private>false</Private>
 		</Reference>
-	</ItemGroup>
+		<Reference Include="Unity.Addressables">
+			<HintPath>..\external_dlls\Unity.Addressables.dll</HintPath>
+			<Publicize>true</Publicize>
+			<Private>false</Private>
+		</Reference>
+    </ItemGroup>
     <ItemGroup>
         <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.0" PrivateAssets="all" />
         <PackageReference Include="BepInEx.Core" Version="5.*" />
         <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
-		<PackageReference Include="SpaceWarp" Version="1.0.1" />
         <PackageReference Include="HarmonyX" Version="2.10.1" />
         <PackageReference Include="UnityEngine.Modules" Version="2020.3.33" IncludeAssets="compile" />
     </ItemGroup>

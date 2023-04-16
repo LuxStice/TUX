@@ -14,13 +14,14 @@ texture _ThisIsAKSP2Texture = textureName
 texture _ThisIsAWhiteTexture = white
 texture _ThisIsANormalTexture = NORMAL
 ```
-### Floats and Ints
+
+##### Floats and Ints
 Both floats and Ints can have min and max values, they are set like this:
 `defaultValue : minValue : maxValue`
 Example:
 `0,2 : 0 : 2` - This will tell TUX that your shader's default value is 0,2 and that value cannot be less than 0 or bigger than 2, this is mostly used on the UI
 
-#### Observations
+##### Observations
 Colors range from 0,255 any number below will be set as 0 and any number above as 255
 KSP2 Textures must have the same name as in game (CaseSensitive)
 
@@ -35,12 +36,12 @@ _ThisIsAColor = 0,123,255,300
 _ThisIsAModAddedTexture = modid/images/cooltexture.png
 _ThisIsAKSP2Texture = textureName
 ```
-#### Observations
+##### Observations
 Any property not disclosed will be set as is on the original shader!
 Colors range from 0,255 any number below will be set as 0 and any number above as 255
 KSP2 Textures must have the same name as in game (CaseSensitive)
 
-### Heres an example
+##### Example
 ```
 SHADER = KSP2/Scenery/Standard (Opaque)
 OVERRIDE = (engine_1v_methalox_swivel, Engine_Swivel)
